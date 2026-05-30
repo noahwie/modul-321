@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+
+  broker:
+    image: eclipse-mosquitto
+    container_name: mqtt-broker
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+    networks:
+      - mqtt-net
+    restart: unless-stopped
+
+  sensor1:
+    build: ./sensor
+    container_name: mqtt-sensor1
+    environment:
+      - MQTT_BROKER=broker
+    command: ["--pub=1", "--sub=1"]
+    depends_on:
+      - broker
+    networks:
+      - mqtt-net
+    restart: unless-stopped
+
+  sensor2:
+    build: ./sensor
+    container_name: mqtt-sensor2
+    environment:
+      - MQTT_BROKER=broker
+    command: ["--pub=2", "--sub=2"]
+    depends_on:
+      - broker
+    networks:
+      - mqtt-net
+    restart: unless-stopped
+
+  sensor3:
+    build: ./sensor
+    container_name: mqtt-sensor3
+    environment:
+      - MQTT_BROKER=broker
+    command: ["--pub=3", "--sub=3"]
+    depends_on:
+      - broker
+    networks:
+      - mqtt-net
+    restart: unless-stopped
+
+  node-exporter:
+    image: quay.io/prometheus/node-exporter:latest
+    container_name: node-exporter
+    pid: host
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/host'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host:ro,rslave
+    networks:
+      - mqtt-net
+    ports:
+      - "9100:9100"
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus
+    container_name: mqtt-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - mqtt-net
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana
+    container_name: mqtt-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_INSTALL_PLUGINS=grafana-mqtt-datasource
+    networks:
+      - mqtt-net
+    restart: unless-stopped
+    
+ 
+# Define the custom network
+networks:
+  mqtt-net:
+    driver: bridge
